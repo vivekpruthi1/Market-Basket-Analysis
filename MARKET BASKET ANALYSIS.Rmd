@@ -1,0 +1,239 @@
+---
+title: "MARKET BASKET ANALYSIS"
+author: 'Vivek Pruthi,Murali Korrapati, Jyothi Pulimamidi '
+date: "August 17, 2017"
+output:
+  html_document: default
+  pdf_document: default
+  word_document: default
+---
+
+##An attempt to understand the customer preferences:
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+This project is an attempt to understand the transactional datasetby exploring the dataset further and then try to find out the patterns in the transactions and identify the association Rules. Identifying the association among the parts of transaction can help us understand the effect one part can make on the other part. Once the if x then y scenario is understood, interested party can tweek the purchasing,sales offers, position of item , inventory and even discontinue few categories to help the bottomline of the company.
+
+We will use the "Groceries" dataset . The Groceries data set contains 1 month (30 days) of real-world point-of-sale transaction data from a typical local grocery outlet. The data set contains 9835 transactions and the items are aggregated to 169 items.
+
+Before starting the project we will load the requisite libraries :
+```{r}
+library(arules)
+library(arulesViz)
+library(ggplot2)
+library(dplyr)
+library(plotrix)
+
+```
+
+
+let's first check the data provided to get an overview:
+```{r}
+data("Groceries")
+class(Groceries)
+str(Groceries)
+
+```
+
+As we see that this is transaction dataset . let's try to explore the data within. following is the sparce matrix in the data :
+```{r}
+Groceries@data[1:10,1:10]
+
+```
+
+Let's check the iteminfo in the data :
+
+```{r}
+iteminfo<-Groceries@itemInfo
+iteminfo<-as.data.frame(iteminfo)
+iteminfo[1:20,]
+
+```
+
+Let's try to get an overview of level1 of the groceries i.e. a top level view , means what are the main categories sold in the store and how many items are in those categories.
+
+```{r,fig.width=10}
+
+category_details<-iteminfo%>%group_by(level1)%>%summarize(no_of_items=n())
+
+pie3D(x = category_details$no_of_items,labels = category_details$level1 ,radius = 2,explode=0.2)
+
+```
+
+we can clearly see that there are 10 categories of products sold in these transactions and most of them are edibles:
+```{r}
+levels(category_details$level1)
+
+```
+
+Let's go into details and check the item labels sold in these transactions:
+
+```{r}
+itemLabels(Groceries)
+
+```
+
+We can plot the transactions also. For clarity of graph and for proper understanding it is better to plot a subset of dataas:
+```{r}
+plot(Groceries[1:50])
+```
+
+There are 169 products which are sold on these transactions. Let's try the first overview over the popularity of a product by checking the frequency of the product. we will find the 10 most popular products and 10 least popular products . Top 10 products by frequency are : 
+
+```{r}
+sort(itemFrequency(Groceries,type="absolute"),decreasing = T)[1:10]
+
+```
+
+Bottom 10 products by frequency are :
+
+```{r}
+sort(itemFrequency(Groceries,type="absolute"),decreasing = F)[1:10]
+
+```
+
+we can plot the frequencies of most famous 10 products next to the least 10 sold products for visual interpratations as:
+
+```{r,fig.height=6}
+itemFrequencyPlot(Groceries,topN=10,main="Top 10" , type="absolute",ylab="Absolute Frequency")
+
+barplot(sort(table(unlist(LIST(Groceries)))[1:10],decreasing = F),las=2 , main="Bottom 10")
+
+```
+
+Next obvious step would be to see the association in sales among different pairs of products and try a graphical representation :
+
+```{r}
+crossTable(Groceries,sort=T)[1:5,1:5]
+
+```
+
+We can graphically check these items with the mosaicplot , but the limitations come to the forefront as the number of items increase in the matrix.
+
+```{r}
+mosaicplot(crossTable(Groceries,sort=T)[1:5,1:5])
+
+```
+
+we can find the number of transaction in which 2 items were bought together like:
+```{r}
+crossTable(Groceries)["soda","yogurt"]
+```
+
+Not only can we use the count but other measures like "support","confidence","lift","chisquared" can also be found using the crosstable as:
+
+```{r}
+crossTable(Groceries,measure="support")["soda","yogurt"]
+
+```
+
+next obvious step will be to find out a way to create more itemsets that are bought together on the transactions and to find the frequency of those itemsets as well as the other measures like support,confidence,lift and chi. we will use the arules package for this as:
+
+```{r}
+itemset<-apriori(Groceries,parameter = list(support=0.001,minlen=2,target="frequent"))
+summary(itemset)
+
+```
+
+to find the top 10 itemsets using support as the main measure :
+
+```{r}
+inspect(sort(itemset,decreasing = T,by="support")[1:10])
+
+```
+
+to add another measure to the result e.g check lift :
+
+```{r}
+itemset@quality$lift<-interestMeasure(itemset,measure = "lift",transactions = Groceries)
+inspect(sort(itemset,decreasing = T,by="support")[1:10])
+```
+
+when we need to search for rules insted of the itemsets we change the target to the "rules" in the apriori command as :
+
+```{r}
+rules<-apriori(Groceries,parameter = list(support=.001,confidence=0.9,target="rules"))
+summary(rules)
+```
+
+As with the 0.9 confidence we got 129 rules, we can inspect the top 10 after sorting with support as well as confidence:
+
+```{r}
+inspect(sort(rules,decreasing = T,by=c("support","confidence"))[1:10])
+
+```
+
+as we see that we have rules in the summary insted of the itemsets now with lhs and rhs shown, it is of utmost importance for business purposes to focus on the relevant rules by filtering , so that proper business decisions can be taken.
+
+checking the items on lhs only :
+```{r}
+focus_rules1<-subset(rules,subset=(lhs%in% "yogurt"))
+inspect(sort(focus_rules1,by="support",decreasing = T)[1:10])
+```
+
+above inspection show us the top 10 rules by support showing the itemsets with "yogurt" in it that will result in the purchase of other items i.e.a basket full of other products with yougurt being one of them will result in purchase of what new item.This may not be that important but it will become interesting furter.
+Let us find the rules with whole milk and yogurt on lhs result in purchase of what on rhs.
+
+```{r}
+focus_rules2<-subset(rules,subset=(lhs%ain%c("yogurt","whole milk")))
+
+inspect(sort(focus_rules2,decreasing = T,by="support")[1:5])
+```
+
+In fact this comes with " yogurt" and " whole milk" with other products in the basket but if we want to focys only on the person buying only these two on lhs and are interested in checking the rhs for him/her , we will have to tweak the rules as :
+
+```{r}
+rules_tweek<-apriori(Groceries,parameter = list(support=0.01,confidence=0.9,target="rules"),appearance = list(lhs = c("whole milk","yogurt"), default="rhs"))
+summary(rules_tweek)
+
+```
+
+It comes with 0 rules, as there maynot be datapoints supporting this but we can check with basket containing {citrus fruit,butter,curd} on lhs for an example and check rhs:
+```{r}
+rules_tweek2<-apriori(Groceries,parameter = list(support=0.001,confidence=0.5,target="rules",minlen=4,maxlen=4),appearance = list(lhs = c("citrus fruit","butter","curd"), default="rhs"))
+summary(rules_tweek2)
+```
+
+now we have 1 rule and we can inspect those as :
+
+```{r}
+inspect(rules_tweek2)
+```
+
+Clearly it tells us that these 3 products together can lead to buying the 4th product " whole milk" .we have that happening on 9 out of 10 transactions like that . although the %age of such transactions in the total transactions is low. as the lift is high , putting these 3 products together may induce the customer to buy the 4th .
+
+Now we come to the stage of graphically showing the rules in the form of a network diagram where inputs(lhs) are incoming arrows to the circle and the outputs(rhs) are outgoing arrows. It may not be clear from whole rules graph ,but we will filter down to understand:
+
+```{r}
+plot(rules,method = "graph",shading = T)
+
+```
+
+using the same on a subset of rules:
+
+```{r}
+
+plot(rules[1:10],method = "graph",shading = "lift")
+
+```
+
+As we can see in the subset of rules that 
+{liquor,red/blush wine}         => {bottled beer}     rule in the graph shows big red circle in the centre . size of the circle shows the support and shading shows higher lift. This means this rule needs special attention from the business point of view. To show the directionality of arrows we will graph the single rule as:
+
+```{r}
+plot(rules_tweek2,method = "graph",shading = "lift")
+```
+
+Another way to plot the rules is the following . This is useful , if you want to drill down the rules based on the graph and then analyse further. For this you need to use the interactive part of the plot.
+
+```{r}
+plot(rules)
+
+```
+
+Conclusion:
+
+Although from the analysis of Market basket analysis , it seems like a tool to help retailers ( online or brick) to help them in cross selling, Product placement,Affinity Promotion, fraud detection or customer behavior, but in fact it is an indespensible tool for a data scientist as it is basically and association analysis. By identifying itemsets or set of inputs, we can after analysis safely forecast the outcome with probability of happening mentioned alongside.
+
