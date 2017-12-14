@@ -4,7 +4,7 @@ library(arulesViz)
 data("Groceries")
 groceryitems<-Groceries@itemInfo$labels
 
-ui <- navbarPage(title = "Market basket Analysis",theme = "bootstrap.css",windowTitle = "Market Basket Analysis By Vivek,Murali and Jyothi",
+ui <- navbarPage(title = "Market basket Analysis",theme = "bootstrap.css",windowTitle = "Market Basket Analysis By Vivek Pruthi",
                  navbarMenu(title = "Exploratory Analysis",
                             tabPanel(title = "Exploration",
                                      tags$h3("Exploratory Analaysis"),
