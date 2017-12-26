@@ -4,4 +4,5 @@ This project is an attempt to understand the transactional datasetby exploring t
 mba app is available at : https://vivekpruthi.shinyapps.io/market_basket_analysis_from_transactions/
 
 Prezi Presentation for this project can be checked at :
+
 <https://prezi.com/view/yAECmAk6uLBVEX5A5L9d/>
